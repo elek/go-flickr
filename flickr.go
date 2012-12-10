@@ -13,16 +13,18 @@ import (
 )
 
 const (
-	endpoint        = "http://api.flickr.com/services/rest/?"
-	uploadEndpoint  = "http://api.flickr.com/services/upload/"
-	replaceEndpoint = "http://api.flickr.com/services/replace/"
+	RestEndpoint    = "http://api.flickr.com/services/rest/"
+	UploadEndpoint  = "http://api.flickr.com/services/upload/"
+	ReplaceEndpoint = "http://api.flickr.com/services/replace/"
+	AuthEndpoint    = "http://api.flickr.com/services/auth/"
 	apiHost         = "api.flickr.com"
 )
 
 type Request struct {
-	ApiKey string
-	Method string
+	ApiKey   string
+	Method   string
 	Args   map[string]string
+	Endpoint string
 }
 
 type nopCloser struct {
@@ -43,10 +45,12 @@ func (request *Request) Sign(secret string) {
 	// Remove api_sig
 	delete(args, "api_sig")
 
-	sorted_keys := make([]string, len(args)+2)
+	sorted_keys := make([]string, len(args) + 2)
 
 	args["api_key"] = request.ApiKey
-	args["method"] = request.Method
+	if request.Method != "" {
+		args["method"] = request.Method
+	}
 
 	// Sort array keys
 	i := 0
@@ -82,9 +86,15 @@ func (request *Request) URL() string {
 	args := request.Args
 
 	args["api_key"] = request.ApiKey
-	args["method"] = request.Method
+	if request.Method != "" {
+		args["method"] = request.Method
+	}
 
-	s := endpoint + encodeQuery(args)
+	endpoint := request.Endpoint
+	if endpoint == "" {
+		endpoint = RestEndpoint
+	}
+	s := endpoint + "?" + encodeQuery(args)
 	return s
 }
 
@@ -98,7 +108,7 @@ func (request *Request) Execute() (response string, ret error) {
 	res, err := http.Get(s)
 	defer res.Body.Close()
 	if err != nil {
-		return "", err
+		return "ERROR", err
 	}
 
 	body, _ := ioutil.ReadAll(res.Body)
@@ -167,7 +177,7 @@ func (request *Request) buildPost(url_ string, filename string, filetype string)
 	}()
 
 	http_header := make(http.Header)
-	http_header.Add("Content-Type", "multipart/form-data; boundary="+boundary)
+	http_header.Add("Content-Type", "multipart/form-data; boundary=" + boundary)
 
 	postRequest := &http.Request{
 		Method:        "POST",
@@ -183,7 +193,7 @@ func (request *Request) buildPost(url_ string, filename string, filetype string)
 // Example: 
 // r.Upload("thumb.jpg", "image/jpeg")
 func (request *Request) Upload(filename string, filetype string) (response string, err error) {
-	postRequest, err := request.buildPost(uploadEndpoint, filename, filetype)
+	postRequest, err := request.buildPost(UploadEndpoint, filename, filetype)
 	if err != nil {
 		return "", err
 	}
@@ -191,7 +201,7 @@ func (request *Request) Upload(filename string, filetype string) (response strin
 }
 
 func (request *Request) Replace(filename string, filetype string) (response string, err error) {
-	postRequest, err := request.buildPost(replaceEndpoint, filename, filetype)
+	postRequest, err := request.buildPost(ReplaceEndpoint, filename, filetype)
 	if err != nil {
 		return "", err
 	}
